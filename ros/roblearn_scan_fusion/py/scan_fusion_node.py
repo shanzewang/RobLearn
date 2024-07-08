@@ -45,6 +45,43 @@ def callback_scan_hokuyo(scan_hokuyo):
     publisher_scan_fusion.publish(scan_hokuyo)
 
 
+
+# 增加可读性：
+def callback_scan(scan):
+    """
+    LiDAR订阅者的回调函数。
+    融合来自相机和LiDAR的激光扫描数据。
+    当相机激光扫描的距离较小时，将其替换LiDAR的对应数据。
+    最后发布融合后的激光扫描数据。
+
+    :param scan: LiDAR激光扫描数据 (LaserScan)
+    :return: None
+    """
+    if scan_camera is not None:
+        lidar_scan = list(scan.ranges)
+        
+        # 计算相机扫描数据的一半长度
+        half_length_camera = len(scan_camera.ranges) // 2
+        
+        # 处理前半部分数据
+        for i in range(half_length_camera):
+            if scan_camera.ranges[half_length_camera + i] < scan_camera.range_max and scan_camera.ranges[half_length_camera + i] < scan.ranges[i]:
+                lidar_scan[i] = scan_camera.ranges[half_length_camera + i]
+
+        # 处理后半部分数据
+        for i in range(half_length_camera):
+            index_lidar = len(scan.ranges) - 1 - i
+            if scan_camera.ranges[half_length_camera - i - 1] < scan_camera.range_max and scan_camera.ranges[half_length_camera - i - 1] < scan.ranges[index_lidar]:
+                lidar_scan[index_lidar] = scan_camera.ranges[half_length_camera - i - 1]
+
+        # 更新扫描数据
+        scan.ranges = lidar_scan
+
+        # 发布融合后的扫描数据
+        publisher_scan_fusion.publish(scan)
+
+
+
 def start():
     """
     Start the scan fusion node to fused the hokuyo and realsense laserscan.
